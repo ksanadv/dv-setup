@@ -11,11 +11,11 @@ Used by [dvfiles](https://github.com/ksanadv/dv-folder), [dvnote](https://github
 
 ```toml
 [dependencies]
-dv-setup = { git = "https://github.com/ksanadv/dv-setup", tag = "v0.1.0" }
+dv-setup = { git = "https://github.com/ksanadv/dv-setup", tag = "v0.2.0" }
 ```
 
-An installer describes its app in a `dv_setup::Product` (name, version, install folder, the installed version, its
-checkboxes) and does the install in a `dv_setup::Work`. The `install` method gets which boxes are ticked and a `step`
+An installer describes its app in a `dv_setup::Product`: name, install folder, checkboxes, and a `Scope`, which is
+`App` (its version and the installed one) or `Apps` for several at once. It does the install in a `dv_setup::Work`. The `install` method gets which boxes are ticked and a `step`
 callback for the progress page. `dv_setup::run(product, work)` shows the window.
 
 By convention every installer also takes these switches:
@@ -38,8 +38,11 @@ It registers nothing itself: every app has its own entry in Apps & features. An 
 listed. `--quiet` installs without the window. `--preview` downloads and checks the setups but runs nothing.
 
 ```powershell
-cd suite; cargo build --release    # dv-setup.exe
+..\build-installer.ps1    # dist\dv-setup-<version>-windows-x64.exe and its .sha256
 ```
+
+The library and `dv-setup.exe` share one version (`Cargo.toml` and `suite/Cargo.toml`), and its tag `v<version>` is
+what the installers pin.
 
 ## License
 
