@@ -6,6 +6,10 @@ license = "GPL-3.0-or-later"
 description = "The setup window the dv apps' installers share"
 repository = "https://github.com/ksanadv/dv-setup"
 
+[features]
+# the releases on GitHub (`net`): WinHTTP and BCrypt, which only the dv apps' suite setup needs
+net = ["windows/Win32_Networking_WinHttp", "windows/Win32_Security_Cryptography"]
+
 [dependencies]
 winreg = "0.56.0"
 windows = { version = "0.62", features = [

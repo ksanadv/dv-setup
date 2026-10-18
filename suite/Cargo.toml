@@ -1,0 +1,25 @@
+[package]
+name = "dv-suite"
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "One setup for all the dv apps, each from its latest release on GitHub"
+repository = "https://github.com/ksanadv/dv-setup"
+
+[[bin]]
+name = "dv-setup"
+path = "src/main.rs"
+
+[dependencies]
+dv-setup = { path = "..", features = ["net"] }
+winreg = "0.56.0"
+
+[build-dependencies]
+embed-resource = "3.0.12"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+panic = "abort"
+codegen-units = 1

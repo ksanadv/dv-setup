@@ -3,6 +3,9 @@
 //! The setup window the dv apps' installers share: one page at a time (choose, installing, done), drawn by itself in
 //! the system's light or dark look, with the keys a dialog has (Tab, Space, Enter, Esc). What is installed comes from
 //! the app as a `Product` and a `Work`, so the window knows nothing of any one app.
+#[cfg(feature = "net")]
+pub mod net;
+
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -40,16 +43,25 @@ pub struct Choice {
     pub needs: Option<usize>,
 }
 
+/// what the window installs: one app in a version, or several apps (each box one of them)
+pub enum Scope {
+    App {
+        version: &'static str,
+        /// the version installed now, if any
+        installed: Option<String>,
+    },
+    /// the line above the boxes, "dvfiles has no release yet."
+    Apps { note: Option<String> },
+}
+
 /// what is being installed, as the window shows it
 pub struct Product {
-    /// "dvfiles"
+    /// "dvfiles", or for several apps "the dv apps"
     pub name: &'static str,
-    pub version: &'static str,
+    pub scope: Scope,
     /// the line under the title, "A fast file manager for Windows"
     pub about: &'static str,
     pub location: PathBuf,
-    /// the version installed now, if any
-    pub installed: Option<String>,
     pub choices: Vec<Choice>,
     /// what the last page says, "Find it in the Start menu..."
     pub done: String,
@@ -81,6 +93,15 @@ const FOOT: i32 = 60;
 const ROW: i32 = 32;
 const WM_STEP: u32 = WM_APP + 1;
 const WM_FINISHED: u32 = WM_APP + 2;
+
+/// the installed version against the one being installed
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum Against {
+    Same,
+    /// the installed one is newer: this replaces it with an older one
+    Older,
+    Newer,
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 struct Rgb(u8, u8, u8);
@@ -364,13 +385,28 @@ impl Ui {
     }
 
     fn note(&self) -> Option<(String, bool)> {
-        let v = self.p.installed.as_deref()?;
-        Some(if v == self.p.version {
+        let (version, v) = match &self.p.scope {
+            Scope::App { version, installed } => (*version, installed.as_deref()?),
+            Scope::Apps { note } => return note.clone().map(|n| (n, false)),
+        };
+        Some(if v == version {
             ("This version is installed already; installing it again repairs it.".into(), false)
-        } else if is_newer(v, self.p.version) {
+        } else if is_newer(v, version) {
             (format!("A newer version, {v}, is installed. Your settings are kept."), true)
         } else {
             (format!("Version {v} is installed. Your settings are kept."), false)
+        })
+    }
+
+    /// how this install stands to what is there: None for a fresh install (and for several apps)
+    fn against(&self) -> Option<Against> {
+        let Scope::App { version, installed: Some(i) } = &self.p.scope else { return None };
+        Some(if i == version {
+            Against::Same
+        } else if is_newer(i, version) {
+            Against::Older
+        } else {
+            Against::Newer
         })
     }
 
@@ -383,25 +419,30 @@ impl Ui {
     }
 
     fn title(&self) -> String {
-        let (n, v) = (self.p.name, self.p.version);
-        match (&self.page, self.p.installed.as_deref()) {
-            (Page::Choose, None) => format!("Install {n} {v}"),
-            (Page::Choose, Some(i)) if i == v => format!("Reinstall {n} {v}"),
-            (Page::Choose, Some(i)) if is_newer(i, v) => format!("Replace {n} {i} with {v}"),
-            (Page::Choose, Some(_)) => format!("Update {n} to {v}"),
+        let n = self.p.name;
+        let (v, i) = match &self.p.scope {
+            Scope::App { version, installed } => (format!(" {version}"), installed.as_deref().unwrap_or_default()),
+            Scope::Apps { .. } => (String::new(), ""),
+        };
+        match (&self.page, self.against()) {
+            (Page::Choose, None) => format!("Install {n}{v}"),
+            (Page::Choose, Some(Against::Same)) => format!("Reinstall {n}{v}"),
+            (Page::Choose, Some(Against::Older)) => format!("Replace {n} {i} with{v}"),
+            (Page::Choose, Some(Against::Newer)) => format!("Update {n} to{v}"),
             (Page::Working { .. }, _) => format!("Installing {n}..."),
+            (Page::Done(_), None) if v.is_empty() => format!("{n} are installed"),
             (Page::Done(_), None) => format!("{n} is installed"),
-            (Page::Done(_), Some(_)) => format!("{n} is now version {v}"),
+            (Page::Done(_), Some(_)) => format!("{n} is now version{v}"),
             (Page::Failed(_), _) => "Setup could not finish".into(),
         }
     }
 
     fn primary_label(&self) -> &'static str {
-        match (&self.page, self.p.installed.as_deref()) {
+        match (&self.page, self.against()) {
             (Page::Choose, None) => "Install",
-            (Page::Choose, Some(i)) if i == self.p.version => "Reinstall",
-            (Page::Choose, Some(i)) if is_newer(i, self.p.version) => "Replace",
-            (Page::Choose, Some(_)) => "Update",
+            (Page::Choose, Some(Against::Same)) => "Reinstall",
+            (Page::Choose, Some(Against::Older)) => "Replace",
+            (Page::Choose, Some(Against::Newer)) => "Update",
             (Page::Done(_), _) => "Finish",
             _ => "Close",
         }
