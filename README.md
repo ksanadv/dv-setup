@@ -38,7 +38,7 @@ It registers nothing itself: every app has its own entry in Apps & features. An 
 listed. `--quiet` installs without the window. `--preview` downloads and checks the setups but runs nothing.
 
 ```powershell
-..\build-installer.ps1    # dist\dv-setup-<version>-windows-x64.exe and its .sha256
+.\build-installer.ps1    # dist\dv-setup-<version>-windows-x64.exe and its .sha256
 ```
 
 The library and `dv-setup.exe` share one version (`Cargo.toml` and `suite/Cargo.toml`), and its tag `v<version>` is
